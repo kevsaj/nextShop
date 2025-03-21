@@ -1,0 +1,36 @@
+# Node.js dependencies
+node_modules/
+
+# Logs
+logs/
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# Environment variables
+.env
+.env.local
+.env.development.local
+.env.test.local
+.env.production.local
+
+# Next.js build output
+.next/
+out/
+
+# Vercel
+.vercel/
+
+# IDE files
+.vscode/
+*.swp
+*.swo
+*.idea/
+
+# MacOS files
+.DS_Store
+
+# Other
+dist/
+coverage/
