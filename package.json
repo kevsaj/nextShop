@@ -1,0 +1,25 @@
+{
+  "name": "nextjs-shopify-app",
+  "version": "1.0.0",
+  "description": "A Next.js application to interact with Shopify's GraphQL API.",
+  "main": "index.js",
+  "scripts": {
+    "dev": "next dev",
+    "build": "next build",
+    "start": "next start"
+  },
+  "dependencies": {
+    "next": "latest",
+    "react": "latest",
+    "react-dom": "latest",
+    "graphql-request": "^3.5.0"
+  },
+  "devDependencies": {
+    "typescript": "latest",
+    "@types/react": "latest",
+    "@types/node": "latest"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC"
+}
