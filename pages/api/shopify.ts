@@ -22,7 +22,20 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     }
 
     const data = await response.json();
-    res.status(200).json(data);
+    const products = data.products.map((product: any) => ({
+      id: product.id,
+      title: product.title,
+      vendor: product.vendor,
+      handle: product.handle,
+      tags: product.tags,
+      status: product.status,
+      variants: product.variants.map((variant: any) => ({
+        price: variant.price,
+        sku: variant.sku,
+      })),
+    }));
+
+    res.status(200).json({ products });
   } catch (error: any) {
     res.status(500).json({ error: error.message });
   }
