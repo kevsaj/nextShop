@@ -11,6 +11,7 @@ const Home = () => {
   const [currentPage, setCurrentPage] = useState(1);
   const [isMatching, setIsMatching] = useState(false);
   const [cachedProducts, setCachedProducts] = useState<any[]>([]); // Add state for cached products
+  const [collectrLimit, setCollectrLimit] = useState<string | null>(null); // Add state for Collectr API limit
   const productsPerPage = 5;
 
   const fetchShopifyProducts = async (): Promise<any[]> => {
@@ -240,10 +241,47 @@ const Home = () => {
     }
   };
 
+  // Function to check Collectr API limits
+  const handleCheckLimit = async () => {
+    try {
+      const response = await fetch('/api/collectrLimits');
+      if (!response.ok) {
+        throw new Error('Failed to fetch Collectr API limits');
+      }
+
+      const data = await response.json();
+      console.log('API Response:', data); // Debug the response
+
+      // Adjust this based on the actual structure of the response
+      const remainingCredits = data[0]?.creditsRemaining || 'N/A';
+
+      setCollectrLimit(`Remaining Credits: ${remainingCredits}`);
+      setSuccessMessage('Collectr API limit fetched successfully!');
+      setTimeout(() => setSuccessMessage(null), 3000);
+    } catch (err: any) {
+      console.error('Error fetching Collectr API limits:', err.message);
+      setError(err.message);
+    }
+  };
+
   return (
     <div style={{ backgroundColor: '#121212', color: '#ffffff', minHeight: '100vh', padding: '20px' }}>
       <h1 style={{ textAlign: 'center' }}>Shopify Products</h1>
       <div style={{ marginBottom: '20px', textAlign: 'center' }}>
+        <button
+          onClick={handleCheckLimit}
+          style={{
+            backgroundColor: '#ff5722', // New color for the button (orange-red)
+            color: '#ffffff',
+            border: 'none',
+            padding: '10px 20px',
+            borderRadius: '5px',
+            cursor: 'pointer',
+            marginRight: '10px',
+          }}
+        >
+          Check Limit
+        </button>
         <button
           onClick={handleReadProducts}
           style={{
@@ -301,6 +339,9 @@ const Home = () => {
         </div>
       )}
       {error && <p style={{ color: 'red', textAlign: 'center' }}>{error}</p>}
+      {collectrLimit && (
+        <p style={{ color: '#ffffff', textAlign: 'center', marginBottom: '20px' }}>{collectrLimit}</p>
+      )}
       {products.length > 0 && <ReadProductsTable products={products} />}
       {matchedProducts.length > 0 && (
         <ProductTable
