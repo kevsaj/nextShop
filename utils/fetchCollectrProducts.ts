@@ -13,9 +13,9 @@ export async function fetchAllCollectrProducts(searchString: string) {
   console.log('searchString:', searchString); // Debug the searchString
   const allProducts: any[] = [];
   let page = 1;
-  const limit = 10; // Fetch 50 products per request
+  const limit = 5; // Fetch 5 products per request
 
-  while (true) {
+  while (allProducts.length < limit) {
     try {
       const url = `${COLLECTR_API_BASE_URL}/partners/catalog/search?searchString=${encodeURIComponent(searchString)}&page=${page}&limit=${limit}`;
       console.log(`Request URL: ${url}`);
@@ -48,7 +48,7 @@ export async function fetchAllCollectrProducts(searchString: string) {
       allProducts.push(...products);
 
       // If fewer products are returned than the limit, stop fetching
-      if (products.length < limit) {
+      if (products.length < limit || allProducts.length >= limit) {
         break;
       }
 
@@ -63,5 +63,6 @@ export async function fetchAllCollectrProducts(searchString: string) {
     }
   }
 
-  return allProducts;
+  // Return only the first 5 products
+  return allProducts.slice(0, limit);
 }

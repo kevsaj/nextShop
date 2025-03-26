@@ -10,7 +10,30 @@ const Home = () => {
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
   const [currentPage, setCurrentPage] = useState(1);
   const [isMatching, setIsMatching] = useState(false);
+  const [cachedProducts, setCachedProducts] = useState<any[]>([]); // Add state for cached products
   const productsPerPage = 5;
+
+  const fetchShopifyProducts = async (): Promise<any[]> => {
+    try {
+      const response = await fetch('/api/shopify');
+      if (!response.ok) {
+        throw new Error('Failed to fetch Shopify products');
+      }
+      const data = await response.json();
+
+      // Sort products by price in descending order
+      const sortedProducts = data.products.sort((a: any, b: any) => {
+        const priceA = parseFloat(a.variants?.[0]?.price || '0');
+        const priceB = parseFloat(b.variants?.[0]?.price || '0');
+        return priceB - priceA; // Descending order
+      });
+
+      return sortedProducts;
+    } catch (err: any) {
+      console.error('Error fetching Shopify products:', err.message);
+      throw err;
+    }
+  };
 
   // Fetch products from Shopify API
   const handleReadProducts = async () => {
@@ -75,24 +98,30 @@ const Home = () => {
     try {
       setIsMatching(true); // Indicate that matching has been triggered
 
-      const shopifyResponse = await fetch('/api/shopify');
-      if (!shopifyResponse.ok) {
-        throw new Error('Failed to fetch Shopify products');
+      let sortedProducts = cachedProducts;
+
+      // Fetch and cache products if not already cached
+      if (cachedProducts.length === 0) {
+        console.log('Fetching products from Shopify API...');
+        sortedProducts = await fetchShopifyProducts();
+        setCachedProducts(sortedProducts); // Cache the products
+      } else {
+        console.log('Using cached products...');
       }
-      const shopifyData = await shopifyResponse.json();
 
       // Limit products to the specified page (5 products per page)
       const startIndex = (page - 1) * productsPerPage;
       const endIndex = startIndex + productsPerPage;
-      const productsForPage = shopifyData.products.slice(startIndex, endIndex);
+      const productsForPage = sortedProducts.slice(startIndex, endIndex);
+      console.log('Products for page:', productsForPage);
 
       const matchedProducts = [];
-      const unmatchedProductsList = [];
+      const unmatchedWithCollectrOptions = [];
 
-      // Match products with Supabase database
+      // Process only the products for the current page
       for (const product of productsForPage) {
         const title = product.title;
-        const sku = product.variants?.[0]?.sku || null; // Check for SKU
+        let sku = product.variants?.[0]?.sku || null; // Check for SKU
 
         if (!title || title.trim() === '') {
           console.warn(`Skipping product with invalid title: ${product.title}`);
@@ -110,6 +139,12 @@ const Home = () => {
           continue;
         }
 
+        // Remove trailing "A" from the SKU if it exists
+        if (sku.endsWith('A')) {
+          sku = sku.slice(0, -1); // Remove the last character
+          console.log(`Cleaned SKU: ${sku}`);
+        }
+
         // Check if the product is already matched in the database
         const matchedProductInDb = await checkMatchedProductsInDatabase(title);
         if (matchedProductInDb) {
@@ -120,33 +155,22 @@ const Home = () => {
             matchStatus: 'Matched and Saved',
           });
         } else {
-          unmatchedProductsList.push(product);
-        }
-      }
+          // Fetch Collectr API options for unmatched products
+          console.log('Fetching Collectr products for SKU:', sku);
+          const collectrResponse = await fetch(`/api/collectrProducts?searchString=${encodeURIComponent(sku)}`);
+          if (!collectrResponse.ok) {
+            console.error(`Failed to fetch Collectr products for SKU: ${sku}`);
+            continue;
+          }
 
-      // Fetch Collectr API options for unmatched products (limit to 5 products per page)
-      const unmatchedWithCollectrOptions = [];
-      for (const product of unmatchedProductsList) {
-        const sku = product.variants?.[0]?.sku || null; // Use SKU for Collectr API search
-        if (!sku) {
-          console.warn(`Skipping Collectr API fetch for product without SKU: ${product.title}`);
-          continue;
+          const collectrData = await collectrResponse.json();
+          unmatchedWithCollectrOptions.push({
+            shopifyProduct: product,
+            collectrProducts: collectrData,
+            isMatchedInDatabase: false,
+            matchStatus: 'Not Matched',
+          });
         }
-
-        console.log('Fetching Collectr products for SKU:', sku);
-        const collectrResponse = await fetch(`/api/collectrProducts?searchString=${encodeURIComponent(sku)}`);
-        if (!collectrResponse.ok) {
-          console.error(`Failed to fetch Collectr products for SKU: ${sku}`);
-          continue;
-        }
-
-        const collectrData = await collectrResponse.json();
-        unmatchedWithCollectrOptions.push({
-          shopifyProduct: product,
-          collectrProducts: collectrData,
-          isMatchedInDatabase: false,
-          matchStatus: 'Not Matched',
-        });
       }
 
       // Combine matched and unmatched products
@@ -156,6 +180,8 @@ const Home = () => {
     } catch (err: any) {
       console.error('Error matching products:', err);
       setError(err.message);
+    } finally {
+      setIsMatching(false); // Reset matching state
     }
   };
 
@@ -277,7 +303,18 @@ const Home = () => {
       {error && <p style={{ color: 'red', textAlign: 'center' }}>{error}</p>}
       {products.length > 0 && <ReadProductsTable products={products} />}
       {matchedProducts.length > 0 && (
-        <ProductTable matchedProducts={matchedProducts} handleSelectMatch={handleSelectMatch} />
+        <ProductTable
+          matchedProducts={matchedProducts}
+          handleSelectMatch={handleSelectMatch}
+          currentPage={currentPage}
+          totalPages={Math.ceil(cachedProducts.length / productsPerPage)}
+          onPageChange={(newPage) => {
+            setIsMatching(true); // Set loading state
+            setCurrentPage(newPage);
+            handleMatchProducts(newPage).finally(() => setIsMatching(false)); // Reset loading state
+          }}
+          isLoading={isMatching}
+        />
       )}
       {isMatching && (
         <div style={{ textAlign: 'center', marginTop: '20px' }}>

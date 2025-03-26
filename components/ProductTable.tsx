@@ -3,9 +3,20 @@ import React from 'react';
 interface ProductTableProps {
   matchedProducts: any[];
   handleSelectMatch: (shopifyProduct: any, collectrProduct: any) => void;
+  currentPage: number;
+  totalPages: number;
+  onPageChange: (newPage: number) => void;
+  isLoading: boolean; // Add a prop to indicate loading state
 }
 
-const ProductTable: React.FC<ProductTableProps> = ({ matchedProducts, handleSelectMatch }) => {
+const ProductTable: React.FC<ProductTableProps> = ({
+  matchedProducts,
+  handleSelectMatch,
+  currentPage,
+  totalPages,
+  onPageChange,
+  isLoading,
+}) => {
   // Sort matchedProducts by price in descending order
   const sortedMatchedProducts = [...matchedProducts].sort((a, b) => {
     const priceA = parseFloat(a.shopifyProduct.variants?.[0]?.price || '0');
@@ -16,7 +27,6 @@ const ProductTable: React.FC<ProductTableProps> = ({ matchedProducts, handleSele
   return (
     <div>
       <h2 style={{ textAlign: 'center', marginBottom: '20px' }}>Matched and Unmatched Products</h2>
-      {/* Add a scrollable container for the table */}
       <div
         style={{
           overflowX: 'auto', // Enable horizontal scrolling
@@ -106,6 +116,44 @@ const ProductTable: React.FC<ProductTableProps> = ({ matchedProducts, handleSele
             ))}
           </tbody>
         </table>
+      </div>
+      {/* Pagination Controls */}
+      <div style={{ textAlign: 'center', marginTop: '20px' }}>
+        {isLoading ? (
+          <div style={{ color: '#ffffff', fontSize: '16px' }}>Loading...</div>
+        ) : (
+          <>
+            <button
+              onClick={() => onPageChange(currentPage - 1)}
+              disabled={currentPage === 1}
+              style={{
+                backgroundColor: currentPage === 1 ? '#ccc' : '#1e88e5',
+                color: '#ffffff',
+                border: 'none',
+                padding: '10px 20px',
+                borderRadius: '5px',
+                cursor: currentPage === 1 ? 'not-allowed' : 'pointer',
+                marginRight: '10px',
+              }}
+            >
+              Previous
+            </button>
+            <button
+              onClick={() => onPageChange(currentPage + 1)}
+              disabled={currentPage === totalPages}
+              style={{
+                backgroundColor: currentPage === totalPages ? '#ccc' : '#1e88e5',
+                color: '#ffffff',
+                border: 'none',
+                padding: '10px 20px',
+                borderRadius: '5px',
+                cursor: currentPage === totalPages ? 'not-allowed' : 'pointer',
+              }}
+            >
+              Next
+            </button>
+          </>
+        )}
       </div>
     </div>
   );
