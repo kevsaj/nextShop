@@ -34,7 +34,7 @@ This project is a **Next.js application** that integrates with the **Shopify Gra
 
 ## 📂 Project Structure
 
-```
+```bash
 nextjs-shopify-app
 ├── pages
 │   ├── index.tsx          # Main entry point of the application
@@ -60,6 +60,7 @@ nextjs-shopify-app
 ## ⚙️ Setup Instructions
 
 ### Prerequisites
+
 - Node.js (v14 or higher)
 - npm or yarn
 - Shopify API credentials
@@ -68,7 +69,11 @@ nextjs-shopify-app
 ### Steps
 
 1. **Clone the repository**:
+
    ```bash
+
+   ```
+
    git clone <repository-url>
    cd nextjs-shopify-app
    ```

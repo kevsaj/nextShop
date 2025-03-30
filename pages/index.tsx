@@ -2,6 +2,9 @@ import React, { useState } from 'react';
 import ProductTable from '../components/ProductTable'; // Import the ProductTable component
 import ReadProductsTable from '../components/ReadProductsTable'; // Import the ReadProductsTable component
 import { checkMatchedProductsInDatabase } from '../utils/supabaseClient';
+import { generateSkuCsv } from '../utils/generateSkuCsv';
+import ReadAndUpdateCsv from '../components/ReadAndUpdateCsv';
+import SearchSkuTable from '../components/SearchSkuTable';
 
 const Home = () => {
   const [products, setProducts] = useState<any[]>([]);
@@ -12,7 +15,8 @@ const Home = () => {
   const [isMatching, setIsMatching] = useState(false);
   const [cachedProducts, setCachedProducts] = useState<any[]>([]); // Add state for cached products
   const [collectrLimit, setCollectrLimit] = useState<string | null>(null); // Add state for Collectr API limit
-  const productsPerPage = 5;
+  const [isGeneratingCsv, setIsGeneratingCsv] = useState(false); // Add state for CSV generation
+  const productsPerPage = 30;
 
   const fetchShopifyProducts = async (): Promise<any[]> => {
     try {
@@ -264,6 +268,42 @@ const Home = () => {
     }
   };
 
+  // Function to generate the SKU CSV
+  const handleGenerateCsv = async () => {
+    try {
+      setIsGeneratingCsv(true); // Set the generating state to true
+      let shopifyProducts = products;
+
+      // Fetch products if not already available
+      if (products.length === 0) {
+        console.log('Fetching products from Shopify API...');
+        const response = await fetch('/api/shopify'); // Replace with your actual API endpoint
+        if (!response.ok) {
+          throw new Error('Failed to fetch Shopify products');
+        }
+        const data = await response.json();
+        console.log('API Response:', data); // Debug the response
+        shopifyProducts = data.products; // Use the fetched products
+        setProducts(shopifyProducts); // Update the products state
+      }
+
+      // Generate the SKU CSV
+      if (shopifyProducts.length > 0) {
+        await generateSkuCsv(shopifyProducts);
+        setSuccessMessage('CSV file generated successfully!');
+      } else {
+        throw new Error('No products available to generate CSV');
+      }
+
+      setTimeout(() => setSuccessMessage(null), 3000);
+    } catch (err: any) {
+      console.error('Error generating CSV:', err.message);
+      setError(err.message);
+    } finally {
+      setIsGeneratingCsv(false); // Reset the generating state
+    }
+  };
+
   return (
     <div style={{ backgroundColor: '#121212', color: '#ffffff', minHeight: '100vh', padding: '20px' }}>
       <h1 style={{ textAlign: 'center' }}>Shopify Products</h1>
@@ -319,10 +359,32 @@ const Home = () => {
             padding: '10px 20px',
             borderRadius: '5px',
             cursor: 'pointer',
+            marginRight: '10px',
           }}
         >
           Match Products
         </button>
+        <button
+          onClick={handleGenerateCsv}
+          style={{
+            backgroundColor: '#ff9800',
+            color: '#ffffff',
+            border: 'none',
+            padding: '10px 20px',
+            borderRadius: '5px',
+            cursor: 'pointer',
+            marginRight: '10px',
+          }}
+          disabled={isGeneratingCsv} // Disable the button while generating CSV
+        >
+          {isGeneratingCsv ? 'Generating CSV...' : 'Generate SKU CSV'}
+        </button>
+        <div style={{ marginBottom: '20px' }}>
+          <ReadAndUpdateCsv />
+        </div>
+        <div style={{ marginBottom: '20px' }}>
+          <SearchSkuTable />
+        </div>
       </div>
       {successMessage && (
         <div
@@ -340,7 +402,9 @@ const Home = () => {
       )}
       {error && <p style={{ color: 'red', textAlign: 'center' }}>{error}</p>}
       {collectrLimit && (
-        <p style={{ color: '#ffffff', textAlign: 'center', marginBottom: '20px' }}>{collectrLimit}</p>
+        <p style={{ color: '#ffffff', textAlign: 'center', marginBottom: '20px' }}>
+          {collectrLimit}
+        </p>
       )}
       {products.length > 0 && <ReadProductsTable products={products} />}
       {matchedProducts.length > 0 && (

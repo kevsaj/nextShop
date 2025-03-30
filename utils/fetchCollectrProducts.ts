@@ -1,23 +1,24 @@
 const COLLECTR_API_BASE_URL = process.env.COLLECTR_API_BASE_URL!;
 const COLLECTR_API_KEY = process.env.COLLECTR_API_KEY!;
 
-function delay(ms: number) {
-  return new Promise((resolve) => setTimeout(resolve, ms));
-}
-
 export async function fetchAllCollectrProducts(searchString: string) {
   if (!searchString || searchString === 'N/A' || searchString.trim() === '') {
     throw new Error('Invalid searchString: searchString cannot be null, empty, or N/A');
   }
 
   console.log('searchString:', searchString); // Debug the searchString
+
   const allProducts: any[] = [];
   let page = 1;
-  const limit = 5; // Fetch 5 products per request
+  const limit = 25; // Default limit per page (based on API behavior)
+  const maxPages = 3; // Limit to 3 pages
+  let hasMore = true;
 
-  while (allProducts.length < limit) {
-    try {
-      const url = `${COLLECTR_API_BASE_URL}/partners/catalog/search?searchString=${encodeURIComponent(searchString)}&page=${page}&limit=${limit}`;
+  try {
+    while (hasMore) {
+      const url = `${COLLECTR_API_BASE_URL}/partners/catalog/search?searchString=${encodeURIComponent(
+        searchString
+      )}&page=${page}&limit=${limit}`;
       console.log(`Request URL: ${url}`);
       console.log(`Request Headers:`, {
         'Content-Type': 'application/json',
@@ -38,7 +39,7 @@ export async function fetchAllCollectrProducts(searchString: string) {
       }
 
       const data = await response.json();
-      console.log('API Response:', data); // Debug the API response
+      console.log(`API Response for page ${page}:`, data);
 
       // Since the response is an array, use it directly
       const products = Array.isArray(data) ? data : [];
@@ -48,21 +49,17 @@ export async function fetchAllCollectrProducts(searchString: string) {
       allProducts.push(...products);
 
       // If fewer products are returned than the limit, stop fetching
-      if (products.length < limit || allProducts.length >= limit) {
-        break;
+      if (products.length < limit || page >= maxPages) {
+        hasMore = false;
+      } else {
+        page++; // Move to the next page
       }
-
-      // Increment the page number for the next request
-      page++;
-
-      // Add a delay between requests
-      await delay(1000); // Wait for 1 second before fetching the next page
-    } catch (error: any) {
-      console.error(`Error on page ${page}:`, error); // Log the error
-      throw error;
     }
-  }
 
-  // Return only the first 5 products
-  return allProducts.slice(0, limit);
+    console.log(`Total products fetched for searchString "${searchString}":`, allProducts.length);
+    return allProducts;
+  } catch (error: any) {
+    console.error(`Error fetching Collectr products for searchString "${searchString}":`, error);
+    throw error;
+  }
 }
