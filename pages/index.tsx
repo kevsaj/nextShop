@@ -5,6 +5,7 @@ import { checkMatchedProductsInDatabase } from '../utils/supabaseClient';
 import { generateSkuCsv } from '../utils/generateSkuCsv';
 import ReadAndUpdateCsv from '../components/ReadAndUpdateCsv';
 import SearchSkuTable from '../components/SearchSkuTable';
+import SkuProcessor from '../components/SkuProcessor';
 
 const Home = () => {
   const [products, setProducts] = useState<any[]>([]);
@@ -379,6 +380,9 @@ const Home = () => {
         >
           {isGeneratingCsv ? 'Generating CSV...' : 'Generate SKU CSV'}
         </button>
+        <div style={{ marginBottom: '20px' }}>
+          <SkuProcessor />
+        </div>
         <div style={{ marginBottom: '20px' }}>
           <ReadAndUpdateCsv />
         </div>

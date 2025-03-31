@@ -10,8 +10,8 @@ export async function fetchAllCollectrProducts(searchString: string) {
 
   const allProducts: any[] = [];
   let page = 1;
-  const limit = 25; // Default limit per page (based on API behavior)
-  const maxPages = 3; // Limit to 3 pages
+  const limit = 75; // Default limit per page
+  const maxPages = 3; // Adjust this to fetch more pages if needed
   let hasMore = true;
 
   try {

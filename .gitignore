@@ -34,3 +34,6 @@ out/
 # Other
 dist/
 coverage/
+
+# add temp files in generated folder
+generated/*

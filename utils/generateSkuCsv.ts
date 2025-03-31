@@ -21,14 +21,15 @@ export async function generateSkuCsv(shopifyProducts: any[]) {
       console.log(`Processing only the first SKU: ${sku}`);
 
       try {
-        let allProducts: any[] = [];
+        const allProducts: Map<string, any> = new Map(); // Use a Map to avoid duplicates
         let page = 1;
         const limit = 25; // Default limit per page
-        const maxPages = 25; // Limit to 25 pages
+        const maxPages = 3; // Limit to 3 pages
         let hasMore = true;
 
         // Fetch all pages of data for the current SKU
         while (hasMore) {
+          console.log(`Fetching page ${page} for SKU ${sku}`);
           const response = await fetch(
             `/api/collectrProducts?searchString=${encodeURIComponent(sku)}&page=${page}&limit=${limit}`
           );
@@ -45,7 +46,14 @@ export async function generateSkuCsv(shopifyProducts: any[]) {
           const products = Array.isArray(data) ? data : Array.isArray(data.products) ? data.products : [];
           console.log(`Fetched ${products.length} products for SKU ${sku}, Page ${page}`);
 
-          allProducts = allProducts.concat(products);
+          // Add products to the Map to avoid duplicates
+          products.forEach((product: any) => {
+            if (!allProducts.has(product.id)) {
+              allProducts.set(product.id, product);
+            }
+          });
+
+          console.log(`Total unique products after page ${page}:`, allProducts.size);
 
           // Stop fetching if fewer products are returned than the limit or if maxPages is reached
           if (products.length < limit || page >= maxPages) {
@@ -55,15 +63,18 @@ export async function generateSkuCsv(shopifyProducts: any[]) {
           }
         }
 
-        console.log(`Total products fetched for SKU ${sku}:`, allProducts.length);
+        console.log(`Total unique products fetched for SKU ${sku}:`, allProducts.size);
+
+        // Convert Map to an array for CSV generation
+        const productArray = Array.from(allProducts.values());
 
         // Generate CSV content for the current SKU
         const csvRows = [
           ['ID', 'Category ID', 'Category Name', 'Set Name', 'Product Name', 'Card Number', 'Rarity'], // CSV headers
         ];
 
-        if (allProducts.length > 0) {
-          allProducts.forEach((product: any) => {
+        if (productArray.length > 0) {
+          productArray.forEach((product) => {
             csvRows.push([
               product.id || '',
               product.categoryId || '',
