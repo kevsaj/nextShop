@@ -6,6 +6,7 @@ import { generateSkuCsv } from '../utils/generateSkuCsv';
 import ReadAndUpdateCsv from '../components/ReadAndUpdateCsv';
 import SearchSkuTable from '../components/SearchSkuTable';
 import SkuProcessor from '../components/SkuProcessor';
+import PriceComparisonTable from '../components/PriceComparisonTable';
 
 const Home = () => {
   const [products, setProducts] = useState<any[]>([]);
@@ -17,6 +18,7 @@ const Home = () => {
   const [cachedProducts, setCachedProducts] = useState<any[]>([]); // Add state for cached products
   const [collectrLimit, setCollectrLimit] = useState<string | null>(null); // Add state for Collectr API limit
   const [isGeneratingCsv, setIsGeneratingCsv] = useState(false); // Add state for CSV generation
+  const [showOldFeatures, setShowOldFeatures] = useState(false); // Add state for showing old features
   const productsPerPage = 30;
 
   const fetchShopifyProducts = async (): Promise<any[]> => {
@@ -309,86 +311,119 @@ const Home = () => {
     <div style={{ backgroundColor: '#121212', color: '#ffffff', minHeight: '100vh', padding: '20px' }}>
       <h1 style={{ textAlign: 'center' }}>Shopify Products</h1>
       <div style={{ marginBottom: '20px', textAlign: 'center' }}>
-        <button
-          onClick={handleCheckLimit}
-          style={{
-            backgroundColor: '#ff5722', // New color for the button (orange-red)
-            color: '#ffffff',
-            border: 'none',
-            padding: '10px 20px',
-            borderRadius: '5px',
-            cursor: 'pointer',
-            marginRight: '10px',
-          }}
-        >
-          Check Limit
-        </button>
-        <button
-          onClick={handleReadProducts}
-          style={{
-            backgroundColor: '#1e88e5',
-            color: '#ffffff',
-            border: 'none',
-            padding: '10px 20px',
-            borderRadius: '5px',
-            cursor: 'pointer',
-            marginRight: '10px',
-          }}
-        >
-          Read Products
-        </button>
-        <button
-          onClick={handleUpdateProduct}
-          style={{
-            backgroundColor: '#43a047',
-            color: '#ffffff',
-            border: 'none',
-            padding: '10px 20px',
-            borderRadius: '5px',
-            cursor: 'pointer',
-            marginRight: '10px',
-          }}
-        >
-          Update Product
-        </button>
-        <button
-          onClick={() => handleMatchProducts(currentPage)}
-          style={{
-            backgroundColor: '#f57c00',
-            color: '#ffffff',
-            border: 'none',
-            padding: '10px 20px',
-            borderRadius: '5px',
-            cursor: 'pointer',
-            marginRight: '10px',
-          }}
-        >
-          Match Products
-        </button>
-        <button
-          onClick={handleGenerateCsv}
-          style={{
-            backgroundColor: '#ff9800',
-            color: '#ffffff',
-            border: 'none',
-            padding: '10px 20px',
-            borderRadius: '5px',
-            cursor: 'pointer',
-            marginRight: '10px',
-          }}
-          disabled={isGeneratingCsv} // Disable the button while generating CSV
-        >
-          {isGeneratingCsv ? 'Generating CSV...' : 'Generate SKU CSV'}
-        </button>
         <div style={{ marginBottom: '20px' }}>
-          <SkuProcessor />
+          <PriceComparisonTable />
         </div>
-        <div style={{ marginBottom: '20px' }}>
-          <ReadAndUpdateCsv />
-        </div>
-        <div style={{ marginBottom: '20px' }}>
-          <SearchSkuTable />
-        </div>
+        <button
+          onClick={() => setShowOldFeatures(!showOldFeatures)}
+          style={{
+            backgroundColor: '#424242',
+            color: '#ffffff',
+            border: 'none',
+            padding: '10px 20px',
+            borderRadius: '5px',
+            cursor: 'pointer',
+            marginBottom: '10px',
+          }}
+        >
+          {showOldFeatures ? 'Hide Other Features' : 'Show Other Features'}
+        </button>
+        {showOldFeatures && (
+          <div
+            style={{
+              backgroundColor: '#1e1e1e',
+              padding: '20px',
+              borderRadius: '10px',
+              marginTop: '10px',
+            }}
+          >
+            <button
+              onClick={handleCheckLimit}
+              style={{
+                backgroundColor: '#ff5722',
+                color: '#ffffff',
+                border: 'none',
+                padding: '10px 20px',
+                borderRadius: '5px',
+                cursor: 'pointer',
+                marginRight: '10px',
+                marginBottom: '10px',
+              }}
+            >
+              Check Limit
+            </button>
+            <button
+              onClick={handleReadProducts}
+              style={{
+                backgroundColor: '#1e88e5',
+                color: '#ffffff',
+                border: 'none',
+                padding: '10px 20px',
+                borderRadius: '5px',
+                cursor: 'pointer',
+                marginRight: '10px',
+                marginBottom: '10px',
+              }}
+            >
+              Read Products
+            </button>
+            <button
+              onClick={handleUpdateProduct}
+              style={{
+                backgroundColor: '#43a047',
+                color: '#ffffff',
+                border: 'none',
+                padding: '10px 20px',
+                borderRadius: '5px',
+                cursor: 'pointer',
+                marginRight: '10px',
+                marginBottom: '10px',
+              }}
+            >
+              Update Product
+            </button>
+            <button
+              onClick={() => handleMatchProducts(currentPage)}
+              style={{
+                backgroundColor: '#f57c00',
+                color: '#ffffff',
+                border: 'none',
+                padding: '10px 20px',
+                borderRadius: '5px',
+                cursor: 'pointer',
+                marginRight: '10px',
+                marginBottom: '10px',
+              }}
+            >
+              Match Products
+            </button>
+            <button
+              onClick={handleGenerateCsv}
+              style={{
+                backgroundColor: '#ff9800',
+                color: '#ffffff',
+                border: 'none',
+                padding: '10px 20px',
+                borderRadius: '5px',
+                cursor: 'pointer',
+                marginRight: '10px',
+                marginBottom: '10px',
+              }}
+              disabled={isGeneratingCsv}
+            >
+              {isGeneratingCsv ? 'Generating CSV...' : 'Generate SKU CSV'}
+            </button>
+            <div style={{ marginTop: '20px' }}>
+              <SkuProcessor />
+            </div>
+            <div style={{ marginTop: '20px' }}>
+              <ReadAndUpdateCsv />
+            </div>
+            <div style={{ marginTop: '20px' }}>
+              <SearchSkuTable />
+            </div>
+          </div>
+        )}
       </div>
       {successMessage && (
         <div
