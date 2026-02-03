@@ -12,16 +12,16 @@
     "@supabase/supabase-js": "^2.49.3",
     "file-saver": "^2.0.5",
     "graphql-request": "^3.5.0",
-    "next": "latest",
-    "react": "latest",
-    "react-dom": "latest",
+    "next": "^16.1.6",
+    "react": "^19.0.0",
+    "react-dom": "^19.0.0",
     "xlsx": "^0.18.5"
   },
   "devDependencies": {
     "@types/file-saver": "^2.0.7",
-    "@types/node": "latest",
-    "@types/react": "latest",
-    "typescript": "latest"
+    "@types/node": "^22.10.5",
+    "@types/react": "^19.0.7",
+    "typescript": "^5.7.3"
   },
   "keywords": [],
   "author": "",
