@@ -20,6 +20,11 @@ const PriceComparisonTable: React.FC = () => {
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
   const [priceChanges, setPriceChanges] = useState<PriceChange[]>([]);
   const [showFileUpload, setShowFileUpload] = useState(false);
+  const [currentPage, setCurrentPage] = useState(1);
+  const [itemsPerPage, setItemsPerPage] = useState(50);
+  const [sortField, setSortField] = useState<keyof PriceChange>('priceChange');
+  const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('desc');
+  const [priceFilter, setPriceFilter] = useState<'all' | 'increases' | 'decreases'>('all');
 
   const handleFileChange = (event: React.ChangeEvent<HTMLInputElement>) => {
     const selectedFile = event.target.files?.[0] || null;
@@ -84,6 +89,8 @@ const PriceComparisonTable: React.FC = () => {
 
       const result = await response.json();
       setPriceChanges(result.priceChanges);
+      setCurrentPage(1);
+      setPriceFilter('all');
       
       if (result.priceChanges.length === 0) {
         setSuccessMessage('No price changes detected!');
@@ -169,11 +176,61 @@ const PriceComparisonTable: React.FC = () => {
       
       // Reset the component
       setFile(null);
-      setPriceChanges([]);
+      setCurrentPage(1);
     } catch (err: any) {
       console.error('Error replacing export.csv:', err);
       setError(err.message);
     }
+  };
+
+  const handleSort = (field: keyof PriceChange) => {
+    if (sortField === field) {
+      setSortDirection(sortDirection === 'asc' ? 'desc' : 'asc');
+    } else {
+      setSortField(field);
+      setSortDirection('desc');
+    }
+    setCurrentPage(1); // Reset to first page when sorting
+  };
+
+  // Filter price changes
+  const filteredPriceChanges = priceChanges.filter((change) => {
+    if (priceFilter === 'increases') return parseFloat(change.priceChange) > 0;
+    if (priceFilter === 'decreases') return parseFloat(change.priceChange) < 0;
+    return true;
+  });
+
+  // Sort the price changes
+  const sortedPriceChanges = [...filteredPriceChanges].sort((a, b) => {
+    let aValue: number | string = a[sortField];
+    let bValue: number | string = b[sortField];
+
+    // Convert to numbers for numeric fields
+    if (['oldPrice', 'newPrice', 'priceChange', 'percentageChange'].includes(sortField)) {
+      aValue = parseFloat(aValue as string);
+      bValue = parseFloat(bValue as string);
+      
+      // For price change and percentage, sort by absolute value
+      if (sortField === 'priceChange' || sortField === 'percentageChange') {
+        aValue = Math.abs(aValue);
+        bValue = Math.abs(bValue);
+      }
+    }
+
+    if (aValue < bValue) return sortDirection === 'asc' ? -1 : 1;
+    if (aValue > bValue) return sortDirection === 'asc' ? 1 : -1;
+    return 0;
+  });
+
+  // Paginate the sorted data
+  const totalPages = Math.ceil(sortedPriceChanges.length / itemsPerPage);
+  const startIndex = (currentPage - 1) * itemsPerPage;
+  const endIndex = startIndex + itemsPerPage;
+  const paginatedChanges = sortedPriceChanges.slice(startIndex, endIndex);
+
+  const handlePageChange = (newPage: number) => {
+    setCurrentPage(newPage);
+    window.scrollTo({ top: 0, behavior: 'smooth' });
   };
 
   return (
@@ -303,7 +360,79 @@ const PriceComparisonTable: React.FC = () => {
 
           {priceChanges.length > 0 && (
             <div style={{ marginTop: '20px', overflowX: 'auto' }}>
-              <h4>Price Changes ({priceChanges.length} items)</h4>
+              <div style={{ display: 'flex', gap: '10px', marginBottom: '15px', flexWrap: 'wrap' }}>
+                <button
+                  onClick={() => { setPriceFilter('all'); setCurrentPage(1); }}
+                  style={{
+                    backgroundColor: priceFilter === 'all' ? '#9c27b0' : '#424242',
+                    color: '#ffffff',
+                    border: 'none',
+                    padding: '8px 16px',
+                    borderRadius: '5px',
+                    cursor: 'pointer',
+                    fontWeight: priceFilter === 'all' ? 'bold' : 'normal',
+                  }}
+                >
+                  All ({priceChanges.length})
+                </button>
+                <button
+                  onClick={() => { setPriceFilter('increases'); setCurrentPage(1); }}
+                  style={{
+                    backgroundColor: priceFilter === 'increases' ? '#4caf50' : '#424242',
+                    color: '#ffffff',
+                    border: 'none',
+                    padding: '8px 16px',
+                    borderRadius: '5px',
+                    cursor: 'pointer',
+                    fontWeight: priceFilter === 'increases' ? 'bold' : 'normal',
+                  }}
+                >
+                  ↑ Increases ({priceChanges.filter(c => parseFloat(c.priceChange) > 0).length})
+                </button>
+                <button
+                  onClick={() => { setPriceFilter('decreases'); setCurrentPage(1); }}
+                  style={{
+                    backgroundColor: priceFilter === 'decreases' ? '#f44336' : '#424242',
+                    color: '#ffffff',
+                    border: 'none',
+                    padding: '8px 16px',
+                    borderRadius: '5px',
+                    cursor: 'pointer',
+                    fontWeight: priceFilter === 'decreases' ? 'bold' : 'normal',
+                  }}
+                >
+                  ↓ Decreases ({priceChanges.filter(c => parseFloat(c.priceChange) < 0).length})
+                </button>
+              </div>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '10px' }}>
+                <h4>Price Changes ({filteredPriceChanges.length} items)</h4>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                  <label style={{ fontSize: '14px' }}>
+                    Items per page:
+                    <select
+                      value={itemsPerPage}
+                      onChange={(e) => {
+                        setItemsPerPage(Number(e.target.value));
+                        setCurrentPage(1);
+                      }}
+                      style={{
+                        marginLeft: '5px',
+                        padding: '5px',
+                        borderRadius: '5px',
+                        backgroundColor: '#2a2a2a',
+                        color: '#fff',
+                        border: '1px solid #555',
+                      }}
+                    >
+                      <option value={25}>25</option>
+                      <option value={50}>50</option>
+                      <option value={100}>100</option>
+                      <option value={200}>200</option>
+                    </select>
+                  </label>
+                </div>
+              </div>
+              
               <table
                 style={{
                   width: '100%',
@@ -314,19 +443,37 @@ const PriceComparisonTable: React.FC = () => {
               >
                 <thead>
                   <tr style={{ backgroundColor: '#333' }}>
-                    <th style={tableHeaderStyle}>Product Name</th>
-                    <th style={tableHeaderStyle}>Card Number</th>
-                    <th style={tableHeaderStyle}>Category</th>
-                    <th style={tableHeaderStyle}>Set</th>
-                    <th style={tableHeaderStyle}>Rarity</th>
-                    <th style={tableHeaderStyle}>Old Price</th>
-                    <th style={tableHeaderStyle}>New Price</th>
-                    <th style={tableHeaderStyle}>Change ($)</th>
-                    <th style={tableHeaderStyle}>Change (%)</th>
+                    <th style={tableHeaderStyle} onClick={() => handleSort('productName')}>
+                      Product Name {sortField === 'productName' && (sortDirection === 'asc' ? '↑' : '↓')}
+                    </th>
+                    <th style={tableHeaderStyle} onClick={() => handleSort('cardNumber')}>
+                      Card Number {sortField === 'cardNumber' && (sortDirection === 'asc' ? '↑' : '↓')}
+                    </th>
+                    <th style={tableHeaderStyle} onClick={() => handleSort('category')}>
+                      Category {sortField === 'category' && (sortDirection === 'asc' ? '↑' : '↓')}
+                    </th>
+                    <th style={tableHeaderStyle} onClick={() => handleSort('set')}>
+                      Set {sortField === 'set' && (sortDirection === 'asc' ? '↑' : '↓')}
+                    </th>
+                    <th style={tableHeaderStyle} onClick={() => handleSort('rarity')}>
+                      Rarity {sortField === 'rarity' && (sortDirection === 'asc' ? '↑' : '↓')}
+                    </th>
+                    <th style={tableHeaderStyle} onClick={() => handleSort('oldPrice')}>
+                      Old Price {sortField === 'oldPrice' && (sortDirection === 'asc' ? '↑' : '↓')}
+                    </th>
+                    <th style={tableHeaderStyle} onClick={() => handleSort('newPrice')}>
+                      New Price {sortField === 'newPrice' && (sortDirection === 'asc' ? '↑' : '↓')}
+                    </th>
+                    <th style={tableHeaderStyle} onClick={() => handleSort('priceChange')}>
+                      Change ($) {sortField === 'priceChange' && (sortDirection === 'asc' ? '↑' : '↓')}
+                    </th>
+                    <th style={tableHeaderStyle} onClick={() => handleSort('percentageChange')}>
+                      Change (%) {sortField === 'percentageChange' && (sortDirection === 'asc' ? '↑' : '↓')}
+                    </th>
                   </tr>
                 </thead>
                 <tbody>
-                  {priceChanges.map((change, index) => (
+                  {paginatedChanges.map((change, index) => (
                     <tr
                       key={index}
                       style={{
@@ -362,6 +509,73 @@ const PriceComparisonTable: React.FC = () => {
                   ))}
                 </tbody>
               </table>
+
+              {/* Pagination Controls */}
+              <div style={{ marginTop: '20px', display: 'flex', justifyContent: 'center', alignItems: 'center', gap: '10px' }}>
+                <button
+                  onClick={() => handlePageChange(1)}
+                  disabled={currentPage === 1}
+                  style={{
+                    backgroundColor: currentPage === 1 ? '#555' : '#1e88e5',
+                    color: '#ffffff',
+                    border: 'none',
+                    padding: '8px 12px',
+                    borderRadius: '5px',
+                    cursor: currentPage === 1 ? 'not-allowed' : 'pointer',
+                  }}
+                >
+                  First
+                </button>
+                <button
+                  onClick={() => handlePageChange(currentPage - 1)}
+                  disabled={currentPage === 1}
+                  style={{
+                    backgroundColor: currentPage === 1 ? '#555' : '#1e88e5',
+                    color: '#ffffff',
+                    border: 'none',
+                    padding: '8px 12px',
+                    borderRadius: '5px',
+                    cursor: currentPage === 1 ? 'not-allowed' : 'pointer',
+                  }}
+                >
+                  Previous
+                </button>
+                <span style={{ padding: '0 15px' }}>
+                  Page {currentPage} of {totalPages}
+                </span>
+                <button
+                  onClick={() => handlePageChange(currentPage + 1)}
+                  disabled={currentPage === totalPages}
+                  style={{
+                    backgroundColor: currentPage === totalPages ? '#555' : '#1e88e5',
+                    color: '#ffffff',
+                    border: 'none',
+                    padding: '8px 12px',
+                    borderRadius: '5px',
+                    cursor: currentPage === totalPages ? 'not-allowed' : 'pointer',
+                  }}
+                >
+                  Next
+                </button>
+                <button
+                  onClick={() => handlePageChange(totalPages)}
+                  disabled={currentPage === totalPages}
+                  style={{
+                    backgroundColor: currentPage === totalPages ? '#555' : '#1e88e5',
+                    color: '#ffffff',
+                    border: 'none',
+                    padding: '8px 12px',
+                    borderRadius: '5px',
+                    cursor: currentPage === totalPages ? 'not-allowed' : 'pointer',
+                  }}
+                >
+                  Last
+                </button>
+              </div>
+              
+              <div style={{ marginTop: '10px', textAlign: 'center', fontSize: '14px', color: '#aaa' }}>
+                Showing {startIndex + 1} to {Math.min(endIndex, priceChanges.length)} of {priceChanges.length} items
+              </div>
             </div>
           )}
         </div>
@@ -375,6 +589,8 @@ const tableHeaderStyle: React.CSSProperties = {
   textAlign: 'left',
   borderBottom: '2px solid #555',
   fontWeight: 'bold',
+  cursor: 'pointer',
+  userSelect: 'none',
 };
 
 const tableCellStyle: React.CSSProperties = {

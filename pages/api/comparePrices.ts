@@ -96,9 +96,8 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       const variance = String(row['Variance'] || '').trim();
       const grade = String(row['Grade'] || '').trim();
       const condition = String(row['Card Condition'] || '').trim();
-      const dateAdded = String(row['Date Added'] || '').trim();
-      const quantity = String(row['Quantity'] || '').trim();
-      const key = `${productName}|${cardNumber}|${set}|${variance}|${grade}|${condition}|${dateAdded}|${quantity}`;
+      // Removed dateAdded and quantity from key to make matching more flexible
+      const key = `${productName}|${cardNumber}|${set}|${variance}|${grade}|${condition}`;
       
       if (!oldPricesMap.has(key)) {
         oldPricesMap.set(key, []);
@@ -109,6 +108,8 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     // Compare prices and find changes
     const priceChanges: PriceChange[] = [];
     const usedOldRows = new Map<string, number>(); // Track which old rows we've used
+    let matchedCount = 0;
+    let unmatchedCount = 0;
 
     newData.forEach((newRow: any) => {
       const productName = String(newRow['Product Name'] || '').trim();
@@ -117,12 +118,16 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       const variance = String(newRow['Variance'] || '').trim();
       const grade = String(newRow['Grade'] || '').trim();
       const condition = String(newRow['Card Condition'] || '').trim();
-      const dateAdded = String(newRow['Date Added'] || '').trim();
-      const quantity = String(newRow['Quantity'] || '').trim();
-      const key = `${productName}|${cardNumber}|${set}|${variance}|${grade}|${condition}|${dateAdded}|${quantity}`;
+      // Removed dateAdded and quantity from key
+      const key = `${productName}|${cardNumber}|${set}|${variance}|${grade}|${condition}`;
       
       const oldRows = oldPricesMap.get(key);
-      if (!oldRows || oldRows.length === 0) return;
+      if (!oldRows || oldRows.length === 0) {
+        unmatchedCount++;
+        return;
+      }
+      
+      matchedCount++;
       
       // Get the next unused row for this key
       const usedIndex = usedOldRows.get(key) || 0;
@@ -142,19 +147,6 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
           
           const oldPrice = parseFloat(oldPriceValue) || 0;
           const newPrice = parseFloat(newPriceValue) || 0;
-
-          // Debug logging
-          if (Math.abs(oldPrice - newPrice) > 0.001) {
-            console.log('Price difference found:', {
-              product: newRow['Product Name'],
-              cardNumber: newRow['Card Number'],
-              oldPriceValue,
-              newPriceValue,
-              oldPrice,
-              newPrice,
-              difference: newPrice - oldPrice
-            });
-          }
 
           // Only include if there's a meaningful price change (more than 0.001 difference to avoid floating point issues)
           if (Math.abs(oldPrice - newPrice) > 0.001) {
