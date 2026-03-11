@@ -1,7 +1,15 @@
 import { NextApiRequest, NextApiResponse } from 'next';
-import fs from 'fs';
-import path from 'path';
+import { createClient } from '@supabase/supabase-js';
 import { utils, write } from 'xlsx';
+
+const STORAGE_BUCKET = 'price-comparison';
+const STORAGE_FILE = 'export.csv';
+
+const getSupabaseAdmin = () =>
+  createClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
+  );
 
 export const config = {
   api: {
@@ -43,40 +51,28 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       return res.status(400).json({ error: 'Too many rows. Maximum 50,000 rows allowed.' });
     }
 
-    // Path validation - ensure we only write to the test folder
-    const testDir = path.join(process.cwd(), 'test');
-    const exportFilePath = path.join(testDir, 'export.csv');
-    
-    // Verify the resolved path is actually within the test directory
-    const resolvedPath = path.resolve(exportFilePath);
-    const resolvedTestDir = path.resolve(testDir);
-    
-    if (!resolvedPath.startsWith(resolvedTestDir)) {
-      return res.status(403).json({ error: 'Invalid file path' });
-    }
-
-    // Ensure test directory exists
-    if (!fs.existsSync(testDir)) {
-      fs.mkdirSync(testDir, { recursive: true });
-    }
-
     // Create a worksheet from the new data
     const worksheet = utils.json_to_sheet(newData);
-
-    // Create a workbook
     const workbook = utils.book_new();
     utils.book_append_sheet(workbook, worksheet, 'Sheet1');
+    const csvBuffer: Uint8Array = write(workbook, { type: 'buffer', bookType: 'csv' });
+    const csvBlob = new Blob([csvBuffer], { type: 'text/csv' });
 
-    // Generate CSV buffer
-    const csvBuffer = write(workbook, { type: 'buffer', bookType: 'csv' });
+    // Upload to Supabase Storage (works in Vercel production)
+    const supabase = getSupabaseAdmin();
+    const { error: uploadError } = await supabase.storage
+      .from(STORAGE_BUCKET)
+      .upload(STORAGE_FILE, csvBlob, {
+        contentType: 'text/csv',
+        upsert: true,
+      });
 
-    // Write the new CSV file, replacing the old one
-    fs.writeFileSync(exportFilePath, csvBuffer);
+    if (uploadError) {
+      console.error('Supabase storage upload error:', uploadError);
+      return res.status(500).json({ error: 'Failed to save baseline: ' + uploadError.message });
+    }
 
-    return res.status(200).json({ 
-      message: 'export.csv replaced successfully',
-      path: exportFilePath 
-    });
+    return res.status(200).json({ message: 'Baseline export.csv updated successfully' });
   } catch (error: any) {
     console.error('Error replacing export.csv:', error);
     return res.status(500).json({ error: error.message || 'Failed to replace export.csv' });
