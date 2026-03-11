@@ -2,6 +2,16 @@ import { NextApiRequest, NextApiResponse } from 'next';
 import fs from 'fs';
 import path from 'path';
 import { read, utils } from 'xlsx';
+import { createClient } from '@supabase/supabase-js';
+
+const STORAGE_BUCKET = 'price-comparison';
+const STORAGE_FILE = 'export.csv';
+
+const getSupabaseAdmin = () =>
+  createClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
+  );
 
 export const config = {
   api: {
@@ -74,14 +84,25 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       return res.status(400).json({ error: 'Too many rows. Maximum 50,000 rows allowed.' });
     }
 
-    // Read the existing export.csv file from the test folder
-    const oldFilePath = path.join(process.cwd(), 'test', 'export.csv');
+    // Try Supabase Storage first (production), fall back to local filesystem (dev)
+    let oldFileContent: Buffer;
+    const supabase = getSupabaseAdmin();
+    const { data: storageBlob, error: storageError } = await supabase.storage
+      .from(STORAGE_BUCKET)
+      .download(STORAGE_FILE);
 
-    if (!fs.existsSync(oldFilePath)) {
-      return res.status(404).json({ error: 'Previous export.csv file not found' });
+    if (storageBlob && !storageError) {
+      const arrayBuffer = await storageBlob.arrayBuffer();
+      oldFileContent = Buffer.from(arrayBuffer);
+    } else {
+      // Fallback to local file (used during development or before first baseline upload)
+      const oldFilePath = path.join(process.cwd(), 'test', 'export.csv');
+      if (!fs.existsSync(oldFilePath)) {
+        return res.status(404).json({ error: 'Previous export.csv baseline not found. Please upload a baseline file first.' });
+      }
+      oldFileContent = fs.readFileSync(oldFilePath);
     }
 
-    const oldFileContent = fs.readFileSync(oldFilePath);
     const oldWorkbook = read(oldFileContent, { type: 'buffer' });
     const oldSheetName = oldWorkbook.SheetNames[0];
     const oldSheet = oldWorkbook.Sheets[oldSheetName];
