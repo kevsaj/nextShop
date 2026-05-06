@@ -29,29 +29,28 @@ const PriceComparisonTable: React.FC = () => {
 
   const handleFileChange = (event: React.ChangeEvent<HTMLInputElement>) => {
     const selectedFile = event.target.files?.[0] || null;
-    
+
     // Validate file type
     if (selectedFile) {
       const validTypes = ['.csv', 'text/csv', 'application/vnd.ms-excel', 'application/csv'];
       const fileExtension = selectedFile.name.toLowerCase().substring(selectedFile.name.lastIndexOf('.'));
-      
+
       if (fileExtension !== '.csv' && !validTypes.includes(selectedFile.type)) {
         setError('Invalid file type. Please upload a CSV file.');
         setFile(null);
-        event.target.value = ''; // Reset input
+        event.target.value = '';
         return;
       }
-      
-      // Validate file size (max 10MB)
-      const maxSize = 10 * 1024 * 1024; // 10MB in bytes
+
+      const maxSize = 10 * 1024 * 1024;
       if (selectedFile.size > maxSize) {
         setError('File too large. Maximum size is 10MB.');
         setFile(null);
-        event.target.value = ''; // Reset input
+        event.target.value = '';
         return;
       }
     }
-    
+
     setFile(selectedFile);
     setError(null);
     setSuccessMessage(null);
@@ -68,19 +67,15 @@ const PriceComparisonTable: React.FC = () => {
     setPriceChanges([]);
 
     try {
-      // Read the uploaded CSV file
       const data = await file.arrayBuffer();
       const workbook = read(data, { type: 'array' });
       const sheetName = workbook.SheetNames[0];
       const sheet = workbook.Sheets[sheetName];
       const newRows = utils.sheet_to_json(sheet);
 
-      // Send the new CSV data to the API for comparison
       const response = await fetch('/api/comparePrices', {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
+        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ newData: newRows }),
       });
 
@@ -93,16 +88,53 @@ const PriceComparisonTable: React.FC = () => {
       setCurrentPage(1);
       setPriceFilter('all');
       setMinPriceDiff('0.50');
-      
+
       if (result.priceChanges.length === 0) {
         setSuccessMessage('No price changes detected!');
       } else {
         setSuccessMessage(`Found ${result.priceChanges.length} price changes!`);
       }
-      
+
       setTimeout(() => setSuccessMessage(null), 5000);
     } catch (err: any) {
       console.error('Error comparing prices:', err);
+      setError(err.message);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const handleGenerateShopifyCsv = async () => {
+    if (filteredPriceChanges.length === 0) {
+      setError('No price changes to export with current filters');
+      return;
+    }
+
+    setIsLoading(true);
+    try {
+      const response = await fetch('/api/downloadShopifyCsv', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ priceChanges: filteredPriceChanges }),
+      });
+
+      if (!response.ok) {
+        throw new Error('Failed to generate Shopify CSV');
+      }
+
+      const blob = await response.blob();
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `shopify_price_update_${new Date().toISOString().split('T')[0]}.csv`;
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      window.URL.revokeObjectURL(url);
+
+      setSuccessMessage('Shopify CSV downloaded!');
+      setTimeout(() => setSuccessMessage(null), 3000);
+    } catch (err: any) {
       setError(err.message);
     } finally {
       setIsLoading(false);
@@ -118,9 +150,7 @@ const PriceComparisonTable: React.FC = () => {
     try {
       const response = await fetch('/api/downloadPriceChanges', {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
+        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ priceChanges: filteredPriceChanges }),
       });
 
@@ -128,7 +158,6 @@ const PriceComparisonTable: React.FC = () => {
         throw new Error('Failed to generate CSV');
       }
 
-      // Download the CSV file
       const blob = await response.blob();
       const url = window.URL.createObjectURL(blob);
       const a = document.createElement('a');
@@ -154,7 +183,6 @@ const PriceComparisonTable: React.FC = () => {
     }
 
     try {
-      // Read the file and send it to the API
       const data = await file.arrayBuffer();
       const workbook = read(data, { type: 'array' });
       const sheetName = workbook.SheetNames[0];
@@ -163,9 +191,7 @@ const PriceComparisonTable: React.FC = () => {
 
       const response = await fetch('/api/replaceExport', {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
+        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ newData: rows }),
       });
 
@@ -176,8 +202,7 @@ const PriceComparisonTable: React.FC = () => {
 
       setSuccessMessage('export.csv replaced successfully! Ready for next comparison.');
       setTimeout(() => setSuccessMessage(null), 3000);
-      
-      // Reset the component
+
       setFile(null);
       setCurrentPage(1);
     } catch (err: any) {
@@ -193,10 +218,9 @@ const PriceComparisonTable: React.FC = () => {
       setSortField(field);
       setSortDirection('desc');
     }
-    setCurrentPage(1); // Reset to first page when sorting
+    setCurrentPage(1);
   };
 
-  // Filter price changes
   const minDiff = parseFloat(minPriceDiff) || 0;
   const filteredPriceChanges = priceChanges.filter((change) => {
     const absChange = Math.abs(parseFloat(change.priceChange));
@@ -206,17 +230,14 @@ const PriceComparisonTable: React.FC = () => {
     return true;
   });
 
-  // Sort the price changes
   const sortedPriceChanges = [...filteredPriceChanges].sort((a, b) => {
     let aValue: number | string = a[sortField];
     let bValue: number | string = b[sortField];
 
-    // Convert to numbers for numeric fields
     if (['oldPrice', 'newPrice', 'priceChange', 'percentageChange'].includes(sortField)) {
       aValue = parseFloat(aValue as string);
       bValue = parseFloat(bValue as string);
-      
-      // For price change and percentage, sort by absolute value
+
       if (sortField === 'priceChange' || sortField === 'percentageChange') {
         aValue = Math.abs(aValue);
         bValue = Math.abs(bValue);
@@ -228,7 +249,6 @@ const PriceComparisonTable: React.FC = () => {
     return 0;
   });
 
-  // Paginate the sorted data
   const totalPages = Math.ceil(sortedPriceChanges.length / itemsPerPage);
   const startIndex = (currentPage - 1) * itemsPerPage;
   const endIndex = startIndex + itemsPerPage;
@@ -268,7 +288,6 @@ const PriceComparisonTable: React.FC = () => {
           borderRadius: '14px',
           marginTop: '14px',
         }}>
-          {/* Header */}
           <div style={{ marginBottom: '24px' }}>
             <h3 style={{ margin: '0 0 6px 0', fontSize: '20px', fontWeight: 700, color: '#e0e0e0' }}>
               Price Comparison Tool
@@ -278,7 +297,6 @@ const PriceComparisonTable: React.FC = () => {
             </p>
           </div>
 
-          {/* Upload area */}
           <div style={{
             border: '2px dashed #3d3d5c',
             borderRadius: '10px',
@@ -315,7 +333,6 @@ const PriceComparisonTable: React.FC = () => {
             </span>
           </div>
 
-          {/* Action buttons */}
           <div style={{ display: 'flex', gap: '10px', flexWrap: 'wrap', marginBottom: '16px' }}>
             <button
               onClick={handleComparePrices}
@@ -354,6 +371,23 @@ const PriceComparisonTable: React.FC = () => {
                   ⬇ Download CSV
                 </button>
                 <button
+                  onClick={handleGenerateShopifyCsv}
+                  disabled={isLoading}
+                  style={{
+                    background: isLoading ? '#333' : 'linear-gradient(135deg, #00695c, #00897b)',
+                    color: isLoading ? '#666' : '#fff',
+                    border: 'none',
+                    padding: '10px 22px',
+                    borderRadius: '8px',
+                    cursor: isLoading ? 'not-allowed' : 'pointer',
+                    fontSize: '14px',
+                    fontWeight: 600,
+                    boxShadow: isLoading ? 'none' : '0 2px 8px rgba(0,137,123,0.4)',
+                  }}
+                >
+                  🛍 Download Shopify CSV
+                </button>
+                <button
                   onClick={handleReplaceExport}
                   style={{
                     background: 'linear-gradient(135deg, #e65100, #ff9800)',
@@ -373,7 +407,6 @@ const PriceComparisonTable: React.FC = () => {
             )}
           </div>
 
-          {/* Success / Error banners */}
           {successMessage && (
             <div style={{
               display: 'flex',
@@ -407,11 +440,8 @@ const PriceComparisonTable: React.FC = () => {
             </div>
           )}
 
-          {/* Results section */}
           {priceChanges.length > 0 && (
             <div style={{ marginTop: '8px' }}>
-
-              {/* Stats bar */}
               <div style={{
                 display: 'grid',
                 gridTemplateColumns: 'repeat(auto-fit, minmax(140px, 1fr))',
@@ -437,7 +467,6 @@ const PriceComparisonTable: React.FC = () => {
                 ))}
               </div>
 
-              {/* Filters row */}
               <div style={{
                 display: 'flex',
                 gap: '12px',
@@ -449,7 +478,6 @@ const PriceComparisonTable: React.FC = () => {
                 borderRadius: '12px',
                 border: '1px solid #2d2d44',
               }}>
-                {/* Direction filter group */}
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
                   <span style={{ fontSize: '11px', fontWeight: 600, color: '#555', textTransform: 'uppercase', letterSpacing: '0.6px' }}>
                     Direction
@@ -462,9 +490,9 @@ const PriceComparisonTable: React.FC = () => {
                     overflow: 'hidden',
                   }}>
                     {([
-                      { key: 'all',       label: 'All',        activeColor: '#6a1b9a', activeBg: 'linear-gradient(135deg,#4a148c,#7b1fa2)' },
-                      { key: 'increases', label: '↑ Up',       activeColor: '#2e7d32', activeBg: 'linear-gradient(135deg,#1b5e20,#2e7d32)' },
-                      { key: 'decreases', label: '↓ Down',     activeColor: '#c62828', activeBg: 'linear-gradient(135deg,#b71c1c,#c62828)' },
+                      { key: 'all',       label: 'All',    activeBg: 'linear-gradient(135deg,#4a148c,#7b1fa2)' },
+                      { key: 'increases', label: '↑ Up',   activeBg: 'linear-gradient(135deg,#1b5e20,#2e7d32)' },
+                      { key: 'decreases', label: '↓ Down', activeBg: 'linear-gradient(135deg,#b71c1c,#c62828)' },
                     ] as const).map(({ key, label, activeBg }, i, arr) => {
                       const isActive = priceFilter === key;
                       return (
@@ -492,10 +520,8 @@ const PriceComparisonTable: React.FC = () => {
                   </div>
                 </div>
 
-                {/* Divider */}
                 <div style={{ width: '1px', height: '44px', backgroundColor: '#2d2d44', alignSelf: 'flex-end', marginBottom: '1px' }} />
 
-                {/* Min change input */}
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
                   <span style={{ fontSize: '11px', fontWeight: 600, color: '#555', textTransform: 'uppercase', letterSpacing: '0.6px' }}>
                     Min Change
@@ -543,7 +569,6 @@ const PriceComparisonTable: React.FC = () => {
                   </div>
                 </div>
 
-                {/* Per page — pushed to right */}
                 <div style={{ marginLeft: 'auto', display: 'flex', flexDirection: 'column', gap: '6px' }}>
                   <span style={{ fontSize: '11px', fontWeight: 600, color: '#555', textTransform: 'uppercase', letterSpacing: '0.6px' }}>
                     Per Page
@@ -572,7 +597,6 @@ const PriceComparisonTable: React.FC = () => {
                 </div>
               </div>
 
-              {/* Table */}
               <div style={{ overflowX: 'auto', borderRadius: '10px', border: '1px solid #2d2d44' }}>
                 <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '14px' }}>
                   <thead>
@@ -627,7 +651,7 @@ const PriceComparisonTable: React.FC = () => {
                           <td style={{ ...cellStyle, fontFamily: 'monospace', color: '#bb86fc' }}>{change.cardNumber}</td>
                           <td style={cellStyle}>{change.category}</td>
                           <td style={cellStyle}>{change.set}</td>
-                          <td style={{ ...cellStyle }}>
+                          <td style={cellStyle}>
                             <span style={{
                               padding: '2px 8px',
                               borderRadius: '12px',
@@ -653,7 +677,6 @@ const PriceComparisonTable: React.FC = () => {
                 </table>
               </div>
 
-              {/* Pagination */}
               <div style={{
                 marginTop: '16px',
                 display: 'flex',
