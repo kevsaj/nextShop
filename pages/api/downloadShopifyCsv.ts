@@ -3,6 +3,8 @@ import { utils, write } from 'xlsx';
 import { createClient } from '@supabase/supabase-js';
 
 const IMAGE_BASE_URL = 'https://public.getcollectr.com/public-assets/products/product_';
+const SHOPIFY_STORE_DOMAIN = process.env.SHOPIFY_STORE_DOMAIN!;
+const SHOPIFY_ACCESS_TOKEN = process.env.SHOPIFY_ACCESS_TOKEN!;
 
 const getSupabaseAdmin = () =>
   createClient(
@@ -20,6 +22,47 @@ interface PriceChange {
   newPrice: string;
   priceChange: string;
   percentageChange: string;
+}
+
+// Fetch all Shopify products across pages and return a SKU -> handle map
+async function buildShopifySkuMap(): Promise<Map<string, string>> {
+  const skuToHandle = new Map<string, string>();
+  let url: string | null =
+    `https://${SHOPIFY_STORE_DOMAIN}/admin/api/2023-01/products.json?limit=250&fields=handle,variants`;
+
+  while (url) {
+    const res = await fetch(url, {
+      headers: {
+        'Content-Type': 'application/json',
+        'X-Shopify-Access-Token': SHOPIFY_ACCESS_TOKEN,
+      },
+    });
+
+    if (!res.ok) break;
+
+    const data = await res.json();
+    for (const product of data.products || []) {
+      for (const variant of product.variants || []) {
+        if (variant.sku) {
+          // Store with and without trailing 'A' to match both formats
+          const sku: string = variant.sku;
+          skuToHandle.set(sku, product.handle);
+          if (sku.endsWith('A')) {
+            skuToHandle.set(sku.slice(0, -1), product.handle);
+          } else {
+            skuToHandle.set(sku + 'A', product.handle);
+          }
+        }
+      }
+    }
+
+    // Follow Shopify pagination via Link header
+    const linkHeader = res.headers.get('Link') || '';
+    const nextMatch = linkHeader.match(/<([^>]+)>;\s*rel="next"/);
+    url = nextMatch ? nextMatch[1] : null;
+  }
+
+  return skuToHandle;
 }
 
 export const config = {
@@ -41,30 +84,41 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     return res.status(400).json({ error: 'Too many rows. Maximum 50,000 rows allowed.' });
   }
 
+  // Fetch Shopify SKU->handle map and Supabase image/collectr_id maps in parallel
+  const cardNumbers = Array.from(new Set(priceChanges.map((c: PriceChange) => c.cardNumber)));
+
   const supabase = getSupabaseAdmin();
+  const [skuToHandle, productsResult, cardImagesResult] = await Promise.all([
+    buildShopifySkuMap(),
+    supabase
+      .from('products')
+      .select('sku, collectr_id')
+      .in('sku', cardNumbers),
+    supabase
+      .from('card_images')
+      .select('card_number, image_url')
+      .in('card_number', cardNumbers),
+  ]);
 
-  // Batch fetch all matching Supabase products by SKU (card number)
-  const cardNumbers = [...new Set(priceChanges.map((c: PriceChange) => c.cardNumber))];
-  const { data: dbProducts } = await supabase
-    .from('products')
-    .select('title, handle, sku, collectr_id')
-    .in('sku', cardNumbers);
-
-  // Build a lookup map: sku -> db product
-  const productMap = new Map<string, { title: string; handle: string; sku: string; collectr_id: string }>();
-  (dbProducts || []).forEach((p) => {
-    if (p.sku) productMap.set(p.sku, p);
+  // card_images table takes priority; fall back to products.collectr_id
+  const skuToImageUrl = new Map<string, string>();
+  (productsResult.data || []).forEach((p) => {
+    if (p.sku && p.collectr_id) {
+      skuToImageUrl.set(p.sku, `${IMAGE_BASE_URL}${p.collectr_id}.png`);
+    }
+  });
+  (cardImagesResult.data || []).forEach((p) => {
+    if (p.card_number && p.image_url) {
+      skuToImageUrl.set(p.card_number, p.image_url);
+    }
   });
 
   const csvRows = priceChanges.map((change: PriceChange) => {
-    const dbProduct = productMap.get(change.cardNumber);
-    const collectrId = dbProduct?.collectr_id || '';
-    const imageUrl = collectrId
-      ? `${IMAGE_BASE_URL}${collectrId}.png`
-      : '';
+    const handle = skuToHandle.get(change.cardNumber) || '';
+    const imageUrl = skuToImageUrl.get(change.cardNumber) || '';
 
     return {
-      'Handle': dbProduct?.handle || '',
+      'Handle': handle,
       'Title': change.productName,
       'Variant SKU': change.cardNumber,
       'Variant Price': change.newPrice,

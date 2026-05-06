@@ -21,6 +21,7 @@ out/
 
 # Vercel
 .vercel/
+.claude/
 
 # IDE files
 .vscode/

@@ -7,6 +7,7 @@ import ReadAndUpdateCsv from '../components/ReadAndUpdateCsv';
 import SearchSkuTable from '../components/SearchSkuTable';
 import SkuProcessor from '../components/SkuProcessor';
 import PriceComparisonTable from '../components/PriceComparisonTable';
+import ImageSync from '../components/ImageSync';
 
 const Home = () => {
   const [products, setProducts] = useState<any[]>([]);
@@ -313,6 +314,9 @@ const Home = () => {
       <div style={{ marginBottom: '20px', textAlign: 'center' }}>
         <div style={{ marginBottom: '20px' }}>
           <PriceComparisonTable />
+        </div>
+        <div style={{ marginBottom: '20px' }}>
+          <ImageSync />
         </div>
         <button
           onClick={() => setShowOldFeatures(!showOldFeatures)}
